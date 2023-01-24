@@ -68,9 +68,7 @@ class OrderBook:
         for _id, res in zip(ids, responses):
             if "data" in res:  # kucoin
                 if res["data"]["bids"] is not None:
-                    self._set_price_and_volume(
-                        _id, res["data"]["bids"][0][0], res["data"]["bids"][0][1]
-                    )
+                    self._set_price_and_volume(_id, res["data"]["bids"][0][0], res["data"]["bids"][0][1])
                 continue
             if "bids" in res:  # binance
                 self._set_price_and_volume(_id, res["bids"][0][0], res["bids"][0][1])
@@ -83,9 +81,7 @@ class OrderBook:
                     res["result"][key]["bids"][0][1],
                 )
                 continue
-            logger.warning(
-                "update orderbook: bad response, not matching any exchange format"
-            )
+            logger.warning("update orderbook: bad response, not matching any exchange format")
 
     def get_orderbook_bid_by_trade(self, trade: dict) -> tuple:
         """
@@ -110,9 +106,7 @@ class OrderBook:
         https://min-api.cryptocompare.com/documentation?key=PairMapping&cat=pairMappingExchangeEndpoint
         """
         url = f"{self.cmp_api_base_url}/data/v2/pair/mapping/exchange?e={exchange_name.capitalize()}"
-        request = requests.get(
-            url, headers={"authorization": f"Apikey {self.cmp_api_key}"}, timeout=10
-        )
+        request = requests.get(url, headers={"authorization": f"Apikey {self.cmp_api_key}"}, timeout=10)
 
         # If we got an error when querying the API, log and retry next time
         if request.status_code != 200:
@@ -134,9 +128,7 @@ class OrderBook:
             _id = f"{exchange_name}-{pair}"
             self.symbols_mappings[_id] = exchange_pair
 
-        logger.info(
-            "Saved mappings from CryptoCompare API for exchange %s", exchange_name
-        )
+        logger.info("Saved mappings from CryptoCompare API for exchange %s", exchange_name)
 
     def get_exchange_symbol(self, exchange_name, pair):
         """Return pair with symbol on exchange if there is a mapping"""
