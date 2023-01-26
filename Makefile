@@ -6,7 +6,7 @@ setup:
 
 .PHONY: format
 format:
-	. venv/bin/activate && black -l 120 src/topbid/ tests/
+	. venv/bin/activate && black src/topbid/ tests/
 
 .PHONY: lint
 lint:

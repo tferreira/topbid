@@ -15,5 +15,5 @@ jobs:
         python-version: 3.8
     - run: pip install --upgrade pip
     - run: pip install -e ".[dev]"
-    - run: black --check --diff -l 120 src/topbid/ tests/
+    - run: black --check --diff src/topbid/ tests/
     - run: pylint src/topbid/ tests/
