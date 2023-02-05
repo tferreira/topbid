@@ -18,7 +18,7 @@ pip install topbid
 
 >>> orderbook.update("binance", ["BTC/USDT"])
 
->>> o.get_orderbook_top_bid("binance", "BTC/USDT")
+>>> orderbook.get_orderbook_top_bid("binance", "BTC/USDT")
 (23130.41, 0.05)
 ```
 
