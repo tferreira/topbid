@@ -153,7 +153,7 @@ class OrderBook:
         """
         exchange_pair = self.get_exchange_symbol(exchange_name, pair)
         if exchange_name == "kraken":
-            return f"[{pair}](https://trade.kraken.com/charts/KRAKEN:{exchange_pair.replace('/', '-')})"
+            return f"[{pair}](https://pro.kraken.com/app/trade/{exchange_pair.lower().replace('/', '-')})"
         if exchange_name == "kucoin":
             return f"[{pair}](https://www.kucoin.com/trade/{exchange_pair.replace('/', '-')})"
         if exchange_name == "binance":
