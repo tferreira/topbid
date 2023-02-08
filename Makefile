@@ -12,6 +12,10 @@ format:
 lint:
 	. venv/bin/activate && pylint src/topbid/ tests/
 
+.PHONY: test
+test:
+	. venv/bin/activate && pytest tests/
+
 .PHONY: build
 build:
 	. venv/bin/activate && python -m build
