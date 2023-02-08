@@ -2,8 +2,8 @@
 
 import logging
 
+import request_boost
 import requests
-from request_boost import boosted_requests
 
 logging.basicConfig(
     level=logging.INFO,
@@ -53,7 +53,7 @@ class OrderBook:
             ids.append(_id)
             urls.append(self.get_orderbook_url(exchange_name, pair))
         try:
-            responses = boosted_requests(
+            responses = request_boost.boosted_requests(
                 urls,
                 max_tries=self.requests_max_retry,
                 timeout=self.requests_timeout,
