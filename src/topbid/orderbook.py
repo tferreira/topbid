@@ -42,7 +42,7 @@ class OrderBook:
         Can be used when a trade has just been closed for cleanup.
         """
         _id = f"{exchange_name}-{pair}"
-        del self.orderbook_bids[_id]
+        self.orderbook_bids.pop(_id, None)
 
     def update(self, exchange_name: str, pairs: list) -> None:
         """Update orderbook with pair top buying (bid) prices"""
