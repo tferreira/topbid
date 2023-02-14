@@ -1,9 +1,12 @@
 """ OrderBook """
 
 import logging
+from typing import Union
 
 import request_boost
 import requests
+
+from topbid.scheduler import RepeatEvery
 
 logging.basicConfig(
     level=logging.INFO,
@@ -13,14 +16,16 @@ logger = logging.getLogger("topbid_orderbook")
 
 
 class OrderBook:
-    """Stores top exchange orderbook bid price and volume by pair"""
+    """Fetches exchange orderbook top bid price and volume by pair"""
 
     def __init__(self, cmp_api_key: str, exchanges_list: list) -> None:
         self.cmp_api_key = cmp_api_key
-        self.cmp_api_base_url = "https://min-api.cryptocompare.com"
 
         self.orderbook_bids = {}  # {"binance-BTC/USDT": (20000.1, 0.0001)}
         self.symbols_mappings = {}  # {"kucoin-VAIOT/USDT": "VAI/USDT"}
+
+        self.thread = None
+        self.running = False
         self.requests_max_retry = 2
         self.requests_timeout = 1
 
@@ -28,6 +33,19 @@ class OrderBook:
             exchanges_list = [exchanges_list]
         for exchange_name in exchanges_list:
             self.initialize_symbols_mappings(exchange_name)
+
+    def start(self, update_every: int):
+        """Starts the background task fetching bids"""
+        self.thread = RepeatEvery(update_every, self._update)
+        self.thread.start()
+        self.running = True
+
+    def stop(self):
+        """Stops the background task fetching bids"""
+        self.running = False
+        if self.thread:
+            self.thread.stop()
+        self.orderbook_bids = {}
 
     def _set_price_and_volume(self, _id: str, price: float, volume: float) -> None:
         self.orderbook_bids[_id] = (price, volume)
@@ -44,13 +62,23 @@ class OrderBook:
         _id = f"{exchange_name}-{pair}"
         self.orderbook_bids.pop(_id, None)
 
-    def update(self, exchange_name: str, pairs: list) -> None:
-        """Update orderbook with pair top buying (bid) prices"""
-        urls = []
-        ids = []
+    def add(self, exchange_name: str, pairs: Union[str, list]):
+        """Adds specific exchange/pair(s) to get prices of"""
+        if not isinstance(pairs, list):
+            pairs = [pairs]
         for pair in pairs:
             _id = f"{exchange_name}-{pair}"
-            ids.append(_id)
+            self.orderbook_bids[_id] = (None, None)  # initialize pair
+
+    def _update(self) -> None:
+        """Updates the orderbook with pair top buying (bid) prices"""
+        if not self.running:
+            return
+
+        urls = []
+        ids = list(self.orderbook_bids.keys())
+        for _id in ids:
+            exchange_name, pair = _id.split("-")
             urls.append(self.get_orderbook_url(exchange_name, pair))
         try:
             responses = request_boost.boosted_requests(
@@ -90,7 +118,7 @@ class OrderBook:
     def get_orderbook_top_bid(self, exchange_name: str, pair: str) -> tuple:
         """
         Return best price and volume on exchange for a pair.
-        Values can be `None` if no data is available.
+        Values can be `None` if no data is available yet.
         """
         price, volume = self.orderbook_bids.get(f"{exchange_name}-{pair}", (None, None))
         return price, volume
@@ -100,7 +128,7 @@ class OrderBook:
         Gets all pair mappings for an exchange from CryptoCompare API
         https://min-api.cryptocompare.com/documentation?key=PairMapping&cat=pairMappingExchangeEndpoint
         """
-        url = f"{self.cmp_api_base_url}/data/v2/pair/mapping/exchange?e={exchange_name.capitalize()}"
+        url = f"https://min-api.cryptocompare.com/data/v2/pair/mapping/exchange?e={exchange_name.capitalize()}"
         request = requests.get(
             url, headers={"authorization": f"Apikey {self.cmp_api_key}"}, timeout=10
         )

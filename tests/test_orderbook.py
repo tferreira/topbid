@@ -1,5 +1,6 @@
 """ Tests for main OrderBook class """
 
+import time
 from unittest.mock import patch
 
 import pytest
@@ -63,12 +64,13 @@ def test_get_orderbook_top_bid(cmp_mappings, vaiot_prices):
     orderbook = OrderBook("cmp_api_key", ["kucoin"])
     assert cmp_mappings.call_count == 1
 
-    # update
+    orderbook.add("kucoin", "VAIOT/USDT")
     with patch("request_boost.boosted_requests") as boosted_mock:
         boosted_mock.return_value = vaiot_prices
-        orderbook.update("kucoin", ["VAIOT/USDT"])
+        # start background update
+        orderbook.start(0.1)
+        time.sleep(0.5)
     assert orderbook.orderbook_bids == {"kucoin-VAIOT/USDT": ("0.197007", "1300")}
-    assert orderbook.symbols_mappings == {"kucoin-VAIOT/USDT": "VAI/USDT"}
 
     # get_orderbook_top_bid
     top_bid = orderbook.get_orderbook_top_bid("kucoin", "VAIOT/USDT")
@@ -77,6 +79,8 @@ def test_get_orderbook_top_bid(cmp_mappings, vaiot_prices):
     # delete
     orderbook.delete("kucoin", "VAIOT/USDT")
     assert not orderbook.orderbook_bids
+
+    orderbook.stop()
 
 
 @responses.activate
