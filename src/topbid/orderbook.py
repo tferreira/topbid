@@ -68,7 +68,8 @@ class OrderBook:
             pairs = [pairs]
         for pair in pairs:
             _id = f"{exchange_name}-{pair}"
-            self.orderbook_bids[_id] = (None, None)  # initialize pair
+            if _id not in self.orderbook_bids:
+                self.orderbook_bids[_id] = (None, None)  # initialize pair
 
     def _update(self) -> None:
         """Updates the orderbook with pair top buying (bid) prices"""
