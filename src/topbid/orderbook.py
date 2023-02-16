@@ -94,16 +94,19 @@ class OrderBook:
             return
 
         for _id, res in zip(ids, responses):
-            if "data" in res:  # kucoin
+            if all(k in res for k in ("data", "code")):  # kucoin
                 if res["data"]["bids"] is not None:
                     self._set_price_and_volume(
                         _id, res["data"]["bids"][0][0], res["data"]["bids"][0][1]
                     )
                 continue
-            if "bids" in res:  # binance
+            if all(k in res for k in ("bids", "asks", "lastUpdateId")):  # binance
                 self._set_price_and_volume(_id, res["bids"][0][0], res["bids"][0][1])
                 continue
-            if "result" in res:  # kraken
+            if all(k in res for k in ("bids", "asks", "current", "update")):  # gateio
+                self._set_price_and_volume(_id, res["bids"][0][0], res["bids"][0][1])
+                continue
+            if all(k in res for k in ("result", "error")):  # kraken
                 key = next(iter(res["result"]))
                 self._set_price_and_volume(
                     _id,
@@ -167,12 +170,14 @@ class OrderBook:
         Helper generating URLs to exchange top orderbook APIs.
         """
         pair = self.get_exchange_symbol(exchange_name, pair)
+        if exchange_name == "binance":
+            return f"https://api.binance.com/api/v3/depth?limit=1&symbol={pair.replace('/', '')}"
+        if exchange_name == "gateio":
+            return f"https://api.gateio.ws/api/v4/spot/order_book?currency_pair={pair.replace('/', '_')}"
         if exchange_name == "kraken":
             return f"https://api.kraken.com/0/public/Depth?count=1&pair={pair.replace('/', '')}"
         if exchange_name == "kucoin":
             return f"https://api.kucoin.com/api/v1/market/orderbook/level2_20?symbol={pair.replace('/', '-')}"
-        if exchange_name == "binance":
-            return f"https://api.binance.com/api/v3/depth?limit=1&symbol={pair.replace('/', '')}"
         raise RuntimeError(f"{exchange_name=} not supported")
 
     def get_chart_url(self, exchange_name: str, pair: str) -> str:
@@ -180,10 +185,14 @@ class OrderBook:
         Helper generating URLs to used exchange trade charts.
         """
         exchange_pair = self.get_exchange_symbol(exchange_name, pair)
+        if exchange_name == "binance":
+            return f"[{pair}](https://www.binance.com/en/trade/{exchange_pair.replace('/', '_')})"
+        if exchange_name == "gateio":
+            return (
+                f"[{pair}](https://www.gate.io/trade/{exchange_pair.replace('/', '_')})"
+            )
         if exchange_name == "kraken":
             return f"[{pair}](https://pro.kraken.com/app/trade/{exchange_pair.lower().replace('/', '-')})"
         if exchange_name == "kucoin":
             return f"[{pair}](https://www.kucoin.com/trade/{exchange_pair.replace('/', '-')})"
-        if exchange_name == "binance":
-            return f"[{pair}](https://www.binance.com/en/trade/{exchange_pair.replace('/', '_')})"
         raise RuntimeError(f"{exchange_name=} not supported")

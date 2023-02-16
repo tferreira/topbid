@@ -4,7 +4,7 @@
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
 Helper library to fetch and store current best bid from crypto exchanges APIs.
-Currently supports Binance, Kraken and Kucoin.
+Currently supports Binance, Gateio, Kraken and Kucoin.
 
 Requires Python 3.8+
 
