@@ -63,7 +63,7 @@ class OrderBook:
         Removes volume and price for a specific exchange/pair couple.
         Can be used when a trade has just been closed for cleanup.
         """
-        _id = f"{exchange_name}-{pair}"
+        _id = f"{exchange_name.lower()}-{pair}"
         self.orderbook_bids.pop(_id, None)
         self.orderbook_asks.pop(_id, None)
 
@@ -73,9 +73,11 @@ class OrderBook:
             pairs = [pairs]
         for pair in pairs:
             # Initialize pair
-            _id = f"{exchange_name}-{pair}"
-            self.orderbook_bids[_id] = (None, None)
-            self.orderbook_asks[_id] = (None, None)
+            _id = f"{exchange_name.lower()}-{pair}"
+            if _id not in self.orderbook_bids:
+                self.orderbook_bids[_id] = (None, None)
+            if _id not in self.orderbook_asks:
+                self.orderbook_asks[_id] = (None, None)
 
     def _update(self) -> None:
         """Updates the orderbook with pair top ask/bid prices and volumes"""
@@ -149,7 +151,9 @@ class OrderBook:
         Return best bid price and volume on exchange for a pair.
         Values can be `None` if no data is available yet.
         """
-        price, volume = self.orderbook_bids.get(f"{exchange_name}-{pair}", (None, None))
+        price, volume = self.orderbook_bids.get(
+            f"{exchange_name.lower()}-{pair}", (None, None)
+        )
         return price, volume
 
     def get_orderbook_top_ask(self, exchange_name: str, pair: str) -> tuple:
@@ -157,7 +161,9 @@ class OrderBook:
         Return best ask price and volume on exchange for a pair.
         Values can be `None` if no data is available yet.
         """
-        price, volume = self.orderbook_asks.get(f"{exchange_name}-{pair}", (None, None))
+        price, volume = self.orderbook_asks.get(
+            f"{exchange_name.lower()}-{pair}", (None, None)
+        )
         return price, volume
 
     def initialize_symbols_mappings(self, exchange_name: str) -> None:
@@ -196,14 +202,14 @@ class OrderBook:
 
     def get_exchange_symbol(self, exchange_name: str, pair: str) -> str:
         """Return pair with symbol on exchange if there is a mapping"""
-        _id = f"{exchange_name}-{pair}"
+        _id = f"{exchange_name.lower()}-{pair}"
         return self.symbols_mappings.get(_id, pair)
 
     def get_orderbook_url(self, exchange_name: str, pair: str) -> str:
         """
         Helper generating URLs to exchange top orderbook APIs.
         """
-        pair = self.get_exchange_symbol(exchange_name, pair)
+        pair = self.get_exchange_symbol(exchange_name.lower(), pair)
         if exchange_name == "binance":
             return f"https://api.binance.com/api/v3/depth?limit=1&symbol={pair.replace('/', '')}"
         if exchange_name == "gateio":
@@ -218,6 +224,7 @@ class OrderBook:
         """
         Helper generating URLs to used exchange trade charts.
         """
+        exchange_name = exchange_name.lower()
         exchange_pair = self.get_exchange_symbol(exchange_name, pair)
         if exchange_name == "binance":
             return f"[{pair}](https://www.binance.com/en/trade/{exchange_pair.replace('/', '_')})"
