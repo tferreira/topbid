@@ -3,7 +3,7 @@
 [![Python 3.8](https://img.shields.io/badge/python-3.8-blue.svg)](https://www.python.org/downloads/release/python-380/)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
-Helper library to fetch and store current best bid from crypto exchanges APIs.
+Helper library to fetch and store current orderbook top bid/ask price and volume from crypto exchanges APIs.
 Currently supports Binance, Gateio, Kraken and Kucoin.
 
 Requires Python 3.8+
@@ -28,7 +28,10 @@ pip install topbid
 >>> orderbook.start(update_every=2)
 
 >>> orderbook.get_orderbook_top_bid("binance", "BTC/USDT")
-(23130.41, 0.05)
+(23130.41, 0.0584)
+
+>>> orderbook.get_orderbook_top_ask("binance", "BTC/USDT")
+(23130.43, 0.0214)
 
 >>> orderbook.delete("binance", "BTC/USDT")
 

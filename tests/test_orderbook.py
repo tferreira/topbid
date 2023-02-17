@@ -59,8 +59,8 @@ def test_init(cmp_mappings):
 
 
 @responses.activate
-def test_get_orderbook_top_bid(cmp_mappings, vaiot_prices):
-    """OrderBook get_orderbook_top_bid()"""
+def test_get_orderbook_tops(cmp_mappings, vaiot_prices):
+    """OrderBook get_orderbook_top_bid()/get_orderbook_top_ask()"""
     orderbook = OrderBook("cmp_api_key", ["kucoin"])
     assert cmp_mappings.call_count == 1
 
@@ -71,6 +71,7 @@ def test_get_orderbook_top_bid(cmp_mappings, vaiot_prices):
         orderbook.start(0.1)
         time.sleep(0.5)
     assert orderbook.orderbook_bids == {"kucoin-VAIOT/USDT": ("0.197007", "1300")}
+    assert orderbook.orderbook_asks == {"kucoin-VAIOT/USDT": ("0.197607", "1506.5178")}
 
     # get_orderbook_top_bid
     top_bid = orderbook.get_orderbook_top_bid("kucoin", "VAIOT/USDT")
@@ -79,6 +80,7 @@ def test_get_orderbook_top_bid(cmp_mappings, vaiot_prices):
     # delete
     orderbook.delete("kucoin", "VAIOT/USDT")
     assert not orderbook.orderbook_bids
+    assert not orderbook.orderbook_asks
 
     orderbook.stop()
 
