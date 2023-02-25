@@ -69,7 +69,7 @@ def test_get_orderbook_tops(cmp_mappings, vaiot_prices):
         boosted_mock.return_value = vaiot_prices
         # start background update
         orderbook.start(0.1)
-        time.sleep(0.5)
+        time.sleep(0.2)
     assert orderbook.orderbook_bids == {"kucoin-VAIOT/USDT": ("0.197007", "1300")}
     assert orderbook.orderbook_asks == {"kucoin-VAIOT/USDT": ("0.197607", "1506.5178")}
 

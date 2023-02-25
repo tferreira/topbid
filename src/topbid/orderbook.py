@@ -33,9 +33,11 @@ class OrderBook:
         for exchange_name in exchanges_list:
             self.initialize_symbols_mappings(exchange_name)
 
-    def start(self, update_every: int):
+    def start(self, update_every: float):
         """Starts the background API fetching task"""
-        self.thread = RepeatEvery(update_every, self._update)
+        # Let's have each request timeout happening slightly before the next iteration.
+        timeout = update_every - (update_every * 0.01)
+        self.thread = RepeatEvery(update_every, self._update, timeout=timeout)
         self.thread.start()
         self.running = True
 
@@ -52,6 +54,17 @@ class OrderBook:
 
     def _set_ask_price_and_volume(self, _id: str, price: float, volume: float) -> None:
         self.orderbook_asks[_id] = (price, volume)
+
+    def _init_pair(self, _id: str, force=False) -> None:
+        """
+        Initializes a pair with empty values.
+        Called when adding a pair (but won't reset data if adding the same pair again)
+        May be forced (e.g. during updates, to avoid stale prices on API issues)
+        """
+        if _id not in self.orderbook_bids or force:
+            self.orderbook_bids[_id] = (None, None)
+        if _id not in self.orderbook_asks or force:
+            self.orderbook_asks[_id] = (None, None)
 
     def _reset(self) -> None:
         """Empty all saved pair prices"""
@@ -72,14 +85,11 @@ class OrderBook:
         if not isinstance(pairs, list):
             pairs = [pairs]
         for pair in pairs:
-            # Initialize pair
+            # Initialize pair (if not already added)
             _id = f"{exchange_name.lower()}-{pair}"
-            if _id not in self.orderbook_bids:
-                self.orderbook_bids[_id] = (None, None)
-            if _id not in self.orderbook_asks:
-                self.orderbook_asks[_id] = (None, None)
+            self._init_pair(_id)
 
-    def _update(self) -> None:
+    def _update(self, timeout) -> None:
         """Updates the orderbook with pair top ask/bid prices and volumes"""
         if not self.running:
             return
@@ -89,20 +99,26 @@ class OrderBook:
         for _id in ids:
             exchange_name, pair = _id.split("-")
             urls.append(self.get_orderbook_url(exchange_name, pair))
-        try:
-            responses = request_boost.boosted_requests(
-                urls,
-                max_tries=2,
-                timeout=1,
-                verbose=False,
-                parse_json=True,
-            )
-        except KeyError:
-            self._reset()
-            logger.warning("update orderbook: some requests failed, aborting")
-            return
+
+        responses = request_boost.boosted_requests(
+            urls,
+            max_tries=1,
+            timeout=timeout,
+            verbose=False,
+            parse_json=True,
+        )
 
         for _id, res in zip(ids, responses):
+            if res is None:
+                exchange_name, pair = _id.split("-")
+                logger.warning(
+                    "update orderbook: request error or timeout for %s",
+                    f"{pair} ({exchange_name})",
+                )
+                # cleanup stale data
+                self._init_pair(_id)
+                continue
+
             if all(k in res for k in ("data", "code")):  # kucoin
                 if res["data"]["bids"] is not None:
                     self._set_bid_price_and_volume(
@@ -142,6 +158,8 @@ class OrderBook:
                     res["result"][key]["asks"][0][1],
                 )
                 continue
+
+            # if no case matched the exchange API response format, throw a warning
             logger.warning(
                 "update orderbook: bad response, not matching any exchange format"
             )
