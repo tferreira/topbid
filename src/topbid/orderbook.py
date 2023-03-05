@@ -119,15 +119,31 @@ class OrderBook:
                 self._init_pair(_id)
                 continue
 
-            if all(k in res for k in ("data", "code")):  # kucoin
-                if res["data"]["bids"] is not None:
+            # this may need a bit of improvement but for now conditions order matters
+            # to avoid matching wrong exchange with similar keys
+            if all(k in res for k in ("code", "msg", "data", "ts")):  # okx
+                if res["code"] == "0":
                     self._set_bid_price_and_volume(
-                        _id, res["data"]["bids"][0][0], res["data"]["bids"][0][1]
+                        _id,
+                        float(res["data"][0]["bids"][0][0]),
+                        float(res["data"][0]["bids"][0][1]),
                     )
-                if res["data"]["bids"] is not None:
                     self._set_ask_price_and_volume(
-                        _id, res["data"]["asks"][0][0], res["data"]["asks"][0][1]
+                        _id,
+                        float(res["data"][0]["asks"][0][0]),
+                        float(res["data"][0]["asks"][0][1]),
                     )
+                continue
+            if all(k in res for k in ("data", "code")):  # kucoin
+                if res["code"] == "200000":
+                    if res["data"]["bids"] is not None:
+                        self._set_bid_price_and_volume(
+                            _id, res["data"]["bids"][0][0], res["data"]["bids"][0][1]
+                        )
+                    if res["data"]["bids"] is not None:
+                        self._set_ask_price_and_volume(
+                            _id, res["data"]["asks"][0][0], res["data"]["asks"][0][1]
+                        )
                 continue
             if all(k in res for k in ("bids", "asks", "lastUpdateId")):  # binance
                 self._set_bid_price_and_volume(
@@ -136,6 +152,19 @@ class OrderBook:
                 self._set_ask_price_and_volume(
                     _id, res["asks"][0][0], res["asks"][0][1]
                 )
+                continue
+            if all(k in res for k in ("result", "retCode", "retMsg", "time")):  # bybit
+                if res["retCode"] == 0:
+                    self._set_bid_price_and_volume(
+                        _id,
+                        float(res["result"]["b"][0][0]),
+                        float(res["result"]["b"][0][1]),
+                    )
+                    self._set_ask_price_and_volume(
+                        _id,
+                        float(res["result"]["a"][0][0]),
+                        float(res["result"]["a"][0][1]),
+                    )
                 continue
             if all(k in res for k in ("bids", "asks", "current", "update")):  # gateio
                 self._set_bid_price_and_volume(
@@ -189,7 +218,10 @@ class OrderBook:
         Gets all pair mappings for an exchange from CryptoCompare API
         https://min-api.cryptocompare.com/documentation?key=PairMapping&cat=pairMappingExchangeEndpoint
         """
-        url = f"https://min-api.cryptocompare.com/data/v2/pair/mapping/exchange?e={exchange_name.capitalize()}"
+        cmc_exchange_name = (
+            "Okex" if exchange_name == "okx" else exchange_name.capitalize()
+        )
+        url = f"https://min-api.cryptocompare.com/data/v2/pair/mapping/exchange?e={cmc_exchange_name}"
         request = requests.get(
             url, headers={"authorization": f"Apikey {self.cmp_api_key}"}, timeout=10
         )
@@ -230,12 +262,16 @@ class OrderBook:
         pair = self.get_exchange_symbol(exchange_name.lower(), pair)
         if exchange_name == "binance":
             return f"https://api.binance.com/api/v3/depth?limit=1&symbol={pair.replace('/', '')}"
+        if exchange_name == "bybit":
+            return f"https://api.bybit.com/v5/market/orderbook?category=spot&symbol={pair.upper().replace('/', '')}"
         if exchange_name == "gateio":
             return f"https://api.gateio.ws/api/v4/spot/order_book?currency_pair={pair.replace('/', '_')}"
         if exchange_name == "kraken":
             return f"https://api.kraken.com/0/public/Depth?count=1&pair={pair.replace('/', '')}"
         if exchange_name == "kucoin":
             return f"https://api.kucoin.com/api/v1/market/orderbook/level2_20?symbol={pair.replace('/', '-')}"
+        if exchange_name in ["okx", "okex"]:
+            return f"https://www.okx.com/api/v5/market/books?instId={pair.upper().replace('/', '-')}"
         raise RuntimeError(f"{exchange_name=} not supported")
 
     def get_chart_url(self, exchange_name: str, pair: str) -> str:
@@ -246,6 +282,8 @@ class OrderBook:
         exchange_pair = self.get_exchange_symbol(exchange_name, pair)
         if exchange_name == "binance":
             return f"[{pair}](https://www.binance.com/en/trade/{exchange_pair.replace('/', '_')})"
+        if exchange_name == "bybit":
+            return f"[{pair}](https://www.bybit.com/en-US/trade/spot/{exchange_pair.upper()})"
         if exchange_name == "gateio":
             return (
                 f"[{pair}](https://www.gate.io/trade/{exchange_pair.replace('/', '_')})"
@@ -254,4 +292,6 @@ class OrderBook:
             return f"[{pair}](https://pro.kraken.com/app/trade/{exchange_pair.lower().replace('/', '-')})"
         if exchange_name == "kucoin":
             return f"[{pair}](https://www.kucoin.com/trade/{exchange_pair.replace('/', '-')})"
+        if exchange_name in ["okx", "okex"]:
+            return f"[{pair}](https://www.okx.com/trade-spot/{exchange_pair.lower().replace('/', '-')})"
         raise RuntimeError(f"{exchange_name=} not supported")
