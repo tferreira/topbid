@@ -4,7 +4,7 @@
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
 Helper library to fetch and store current orderbook top bid/ask price and volume from crypto exchanges APIs.
-Currently supports Binance, Gateio, Kraken and Kucoin.
+Currently supports Binance, Bybit, Gateio, Kraken, Kucoin and OKX.
 
 Requires Python 3.8+
 
