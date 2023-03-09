@@ -21,9 +21,7 @@ class OrderBook:
     def __init__(self) -> None:
         self.orderbook_bids = {}  # {"binance-BTC/USDT": (20000.1, 0.0001)}
         self.orderbook_asks = {}  # {"binance-BTC/USDT": (20000.2, 0.0002)}
-
-        # {"kucoin-VAIOT/USDT": {"exchange_symbol": "VAI/USDT", "trade_url": "https..."}}
-        self.symbol_details = {}
+        self.symbols_mappings = {}  # {"kucoin-VAI/USDT": "VAIOT/USDT"}
 
         self.thread = None
         self.running = False
@@ -65,13 +63,13 @@ class OrderBook:
         if _id not in self.orderbook_bids or _id not in self.orderbook_asks or force:
             if not force:
                 # only if new
-                self._populate_symbol_details(_id)
+                self._populate_symbol_mappings(_id)
             self.orderbook_bids[_id] = (None, None)
             self.orderbook_asks[_id] = (None, None)
 
-    def _populate_symbol_details(self, _id: str) -> None:
+    def _populate_symbol_mappings(self, _id: str) -> None:
         """
-        Adds symbol mapping (may be different on exchange) and trade url
+        Adds symbol mapping (may be different on exchange)
         """
         exchange_name, pair = _id.split("-")
         base_currency, quote_currency = pair.split("/")
@@ -103,10 +101,7 @@ class OrderBook:
             if not tickers:
                 continue
             # We don't care about quote currency, ticker should be the same, we can take the first one.
-            self.symbol_details[_id] = {
-                "exchange_symbol": f"{tickers[0]['base']}/{quote_currency}",
-                "trade_url": tickers[0]["trade_url"],
-            }
+            self.symbols_mappings[_id] = f"{tickers[0]['base']}/{quote_currency}"
 
     def _reset(self) -> None:
         """Empty all saved pair prices"""
@@ -258,8 +253,7 @@ class OrderBook:
     def get_exchange_symbol(self, exchange_name: str, pair: str) -> str:
         """Return pair with symbol on exchange"""
         _id = f"{exchange_name.lower()}-{pair}"
-        symbol_details = self.symbol_details.get(_id)
-        return symbol_details["exchange_symbol"] or pair
+        return self.symbols_mappings.get(_id, pair)
 
     def get_orderbook_url(self, exchange_name: str, pair: str) -> str:
         """
@@ -282,9 +276,22 @@ class OrderBook:
 
     def get_chart_url(self, exchange_name: str, pair: str) -> str:
         """
-        Helper getting URLs to exchange trade charts.
+        Helper generating URLs to used exchange trade charts.
         """
         exchange_name = exchange_name.lower()
-        _id = f"{exchange_name.lower()}-{pair}"
-        trade_url = self.symbol_details[_id]["trade_url"]
-        return f"[{pair}]({trade_url})"
+        exchange_pair = self.get_exchange_symbol(exchange_name, pair)
+        if exchange_name == "binance":
+            return f"[{pair}](https://www.binance.com/en/trade/{exchange_pair.replace('/', '_')})"
+        if exchange_name == "bybit":
+            return f"[{pair}](https://www.bybit.com/en-US/trade/spot/{exchange_pair.upper()})"
+        if exchange_name == "gateio":
+            return (
+                f"[{pair}](https://www.gate.io/trade/{exchange_pair.replace('/', '_')})"
+            )
+        if exchange_name == "kraken":
+            return f"[{pair}](https://pro.kraken.com/app/trade/{exchange_pair.lower().replace('/', '-')})"
+        if exchange_name == "kucoin":
+            return f"[{pair}](https://www.kucoin.com/trade/{exchange_pair.replace('/', '-')})"
+        if exchange_name in ["okx", "okex"]:
+            return f"[{pair}](https://www.okx.com/trade-spot/{exchange_pair.lower().replace('/', '-')})"
+        raise RuntimeError(f"{exchange_name=} not supported")
