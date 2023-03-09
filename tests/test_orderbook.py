@@ -9,25 +9,57 @@ import responses
 from topbid.orderbook import OrderBook
 
 
-@pytest.fixture(name="cmp_mappings")
-def fixture_cmp_mappings():
-    """CryptoCompare exchange mappings sample mocked response"""
+@pytest.fixture(name="coingecko_all_coins")
+def fixture_coingecko_all_coins():
+    """CoinGecko all coins sample mocked response"""
     rsp = responses.get(
-        "https://min-api.cryptocompare.com/data/v2/pair/mapping/exchange?e=Kucoin",
+        "https://api.coingecko.com/api/v3/coins/list",
+        json=[{"id": "vaiot", "symbol": "vai", "name": "Vaiot"}],
+    )
+    return rsp
+
+
+@pytest.fixture(name="coingecko_vaiot_kucoin")
+def fixture_coingecko_vaiot_kucoin():
+    """CoinGecko Vaiot coin (on Kucoin) mocked response"""
+    rsp = responses.get(
+        "https://api.coingecko.com/api/v3/coins/vaiot/tickers?exchange_ids=kucoin",
         json={
-            "Response": "Success",
-            "Data": {
-                "current": [
-                    {
-                        "exchange": "Kucoin",
-                        "exchange_fsym": "VAI",
-                        "exchange_tsym": "USDT",
-                        "fsym": "VAIOT",
-                        "last_update": 1620315177.95121,
-                        "tsym": "USDT",
-                    }
-                ]
-            },
+            "name": "Vaiot",
+            "tickers": [
+                {
+                    "base": "VAIOT",
+                    "target": "USDT",
+                    "market": {
+                        "name": "KuCoin",
+                        "identifier": "kucoin",
+                        "has_trading_incentive": False,
+                    },
+                    "last": 0.089662,
+                    "volume": 9486263.13469452,
+                    "converted_last": {
+                        "btc": 4.13e-06,
+                        "eth": 5.83e-05,
+                        "usd": 0.089663,
+                    },
+                    "converted_volume": {
+                        "btc": 39.133522,
+                        "eth": 553.066,
+                        "usd": 850563,
+                    },
+                    "trust_score": "green",
+                    "bid_ask_spread_percentage": 0.244893,
+                    "timestamp": "2023-03-09T05:26:14+00:00",
+                    "last_traded_at": "2023-03-09T05:26:14+00:00",
+                    "last_fetch_at": "2023-03-09T05:26:14+00:00",
+                    "is_anomaly": False,
+                    "is_stale": False,
+                    "trade_url": "https://www.kucoin.com/trade/VAIOT-USDT",
+                    "token_info_url": None,
+                    "coin_id": "vaiot",
+                    "target_coin_id": "tether",
+                }
+            ],
         },
     )
     return rsp
@@ -50,35 +82,39 @@ def fixture_vaiot_prices():
 
 
 @responses.activate
-def test_init(cmp_mappings):
+def test_init(coingecko_all_coins):
     """OrderBook __init__()"""
-    # Instantiating OrderBook calls initialize_symbols_mappings()
-    orderbook = OrderBook("cmp_api_key", ["kucoin"])
-    assert orderbook.symbols_mappings == {"kucoin-VAIOT/USDT": "VAI/USDT"}
-    assert cmp_mappings.call_count == 1
+    # Instantiating OrderBook hydrates coingecko_all_coins_list from CoinGecko API
+    orderbook = OrderBook()
+    assert orderbook.coingecko_all_coins_list == [
+        {"id": "vaiot", "symbol": "vai", "name": "Vaiot"}
+    ]
+    assert coingecko_all_coins.call_count == 1
 
 
 @responses.activate
-def test_get_orderbook_tops(cmp_mappings, vaiot_prices):
+def test_get_orderbook_tops(coingecko_all_coins, coingecko_vaiot_kucoin, vaiot_prices):
     """OrderBook get_orderbook_top_bid()/get_orderbook_top_ask()"""
-    orderbook = OrderBook("cmp_api_key", ["kucoin"])
-    assert cmp_mappings.call_count == 1
+    orderbook = OrderBook()
+    assert coingecko_all_coins.call_count == 1
 
-    orderbook.add("kucoin", "VAIOT/USDT")
+    orderbook.add("kucoin", "VAI/USDT")
+    assert coingecko_vaiot_kucoin.call_count == 1
+
     with patch("request_boost.boosted_requests") as boosted_mock:
         boosted_mock.return_value = vaiot_prices
         # start background update
         orderbook.start(0.1)
         time.sleep(0.2)
-    assert orderbook.orderbook_bids == {"kucoin-VAIOT/USDT": ("0.197007", "1300")}
-    assert orderbook.orderbook_asks == {"kucoin-VAIOT/USDT": ("0.197607", "1506.5178")}
+    assert orderbook.orderbook_bids == {"kucoin-VAI/USDT": ("0.197007", "1300")}
+    assert orderbook.orderbook_asks == {"kucoin-VAI/USDT": ("0.197607", "1506.5178")}
 
     # get_orderbook_top_bid
-    top_bid = orderbook.get_orderbook_top_bid("kucoin", "VAIOT/USDT")
+    top_bid = orderbook.get_orderbook_top_bid("kucoin", "VAI/USDT")
     assert top_bid == ("0.197007", "1300")
 
     # delete
-    orderbook.delete("kucoin", "VAIOT/USDT")
+    orderbook.delete("kucoin", "VAI/USDT")
     assert not orderbook.orderbook_bids
     assert not orderbook.orderbook_asks
 
@@ -86,29 +122,35 @@ def test_get_orderbook_tops(cmp_mappings, vaiot_prices):
 
 
 @responses.activate
-def test_get_exchange_symbol(cmp_mappings):
+def test_get_exchange_symbol(coingecko_all_coins, coingecko_vaiot_kucoin):
     """OrderBook get_exchange_symbol()"""
-    orderbook = OrderBook("cmp_api_key", ["kucoin"])
-    assert cmp_mappings.call_count == 1
-    exchange_symbol = orderbook.get_exchange_symbol("kucoin", "VAIOT/USDT")
-    assert exchange_symbol == "VAI/USDT"
+    orderbook = OrderBook()
+    assert coingecko_all_coins.call_count == 1
+    orderbook.add("kucoin", "VAI/USDT")
+    assert coingecko_vaiot_kucoin.call_count == 1
+    exchange_symbol = orderbook.get_exchange_symbol("kucoin", "VAI/USDT")
+    assert exchange_symbol == "VAIOT/USDT"
 
 
 @responses.activate
-def test_get_orderbook_url(cmp_mappings):
+def test_get_orderbook_url(coingecko_all_coins, coingecko_vaiot_kucoin):
     """OrderBook get_orderbook_url()"""
-    orderbook = OrderBook("cmp_api_key", ["kucoin"])
-    assert cmp_mappings.call_count == 1
-    orderbook_url = orderbook.get_orderbook_url("kucoin", "VAIOT/USDT")
-    url = "https://api.kucoin.com/api/v1/market/orderbook/level2_20?symbol=VAI-USDT"
+    orderbook = OrderBook()
+    assert coingecko_all_coins.call_count == 1
+    orderbook.add("kucoin", "VAI/USDT")
+    assert coingecko_vaiot_kucoin.call_count == 1
+    orderbook_url = orderbook.get_orderbook_url("kucoin", "VAI/USDT")
+    url = "https://api.kucoin.com/api/v1/market/orderbook/level2_20?symbol=VAIOT-USDT"
     assert orderbook_url == url
 
 
 @responses.activate
-def test_get_chart_url(cmp_mappings):
+def test_get_chart_url(coingecko_all_coins, coingecko_vaiot_kucoin):
     """OrderBook get_chart_url()"""
-    orderbook = OrderBook("cmp_api_key", ["kucoin"])
-    assert cmp_mappings.call_count == 1
-    chart_url = orderbook.get_chart_url("kucoin", "VAIOT/USDT")
-    hyperlink = "[VAIOT/USDT](https://www.kucoin.com/trade/VAI-USDT)"
+    orderbook = OrderBook()
+    assert coingecko_all_coins.call_count == 1
+    orderbook.add("kucoin", "VAI/USDT")
+    assert coingecko_vaiot_kucoin.call_count == 1
+    chart_url = orderbook.get_chart_url("kucoin", "VAI/USDT")
+    hyperlink = "[VAI/USDT](https://www.kucoin.com/trade/VAIOT-USDT)"
     assert hyperlink == chart_url

@@ -6,6 +6,9 @@
 Helper library to fetch and store current orderbook top bid/ask price and volume from crypto exchanges APIs.
 Currently supports Binance, Bybit, Gateio, Kraken, Kucoin and OKX.
 
+Some information is currently retrieved from [CoinGecko](https://www.coingecko.com/en/api/documentation) public API.
+Rate limit is between 10-30 requests/minute, which limits the number of new market pairs that can be added every minute.
+
 Requires Python 3.8+
 
 ## Installation
@@ -19,11 +22,8 @@ pip install topbid
 ```python
 >>> from topbid.orderbook import OrderBook
 
-# Instanciate OrderBook with your CMP API key and exchanges you'll be using.
-# Tickers mappings will be retrieved.
->>> orderbook = OrderBook("cryptocompare-api-key", ["binance", "kucoin"])
-2023-01-01 13:37:00,000 - topbid_orderbook - INFO - Saved mappings from CryptoCompare API for exchange binance
-2023-01-01 13:37:00,000 - topbid_orderbook - INFO - Saved mappings from CryptoCompare API for exchange kucoin
+# Instanciate OrderBook.
+>>> orderbook = OrderBook()
 
 # Add one or more market pairs to be fetched from an exchange REST API.
 >>> orderbook.add("binance", "BTC/USDT")
