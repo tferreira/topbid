@@ -93,7 +93,7 @@ class OrderBook:
         for coin_id in coingecko_coin_ids:
             # Get tickers (market pairs) traded on exchange for each found coin symbol
             url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/tickers?exchange_ids={exchange_name}"
-            result = requests.get(url, timeout=2)
+            result = requests.get(url, timeout=5)
             if result.status_code >= 400:
                 continue
             # Best effort here. We take the first coin that returns any tickers.
