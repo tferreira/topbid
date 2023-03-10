@@ -90,18 +90,26 @@ class OrderBook:
         ]
         if not coingecko_coin_ids:
             return
+
+        # Get tickers on exchange for each found coin
+        found_tickers = []
         for coin_id in coingecko_coin_ids:
-            # Get tickers (market pairs) traded on exchange for each found coin symbol
             url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/tickers?exchange_ids={exchange_name}"
             result = requests.get(url, timeout=5)
             if result.status_code >= 400:
                 continue
-            # Best effort here. We take the first coin that returns any tickers.
             tickers = result.json()["tickers"]
             if not tickers:
                 continue
-            # We don't care about quote currency, ticker should be the same, we can take the first one.
-            self.symbols_mappings[_id] = f"{tickers[0]['base']}/{quote_currency}"
+            found_tickers.append(tickers[0]["base"])
+        if not found_tickers:
+            return
+
+        # Best effort here. If we found an identical ticker, we do not change it.
+        exchange_ticker = (
+            base_currency if base_currency in found_tickers else found_tickers[0]
+        )
+        self.symbols_mappings[_id] = f"{exchange_ticker}/{quote_currency}"
 
     def _reset(self) -> None:
         """Empty all saved pair prices"""
