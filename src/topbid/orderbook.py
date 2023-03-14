@@ -4,7 +4,6 @@ import logging
 from typing import Union
 
 import request_boost
-import requests
 
 from topbid.scheduler import RepeatEvery
 
@@ -21,16 +20,9 @@ class OrderBook:
     def __init__(self) -> None:
         self.orderbook_bids = {}  # {"binance-BTC/USDT": (20000.1, 0.0001)}
         self.orderbook_asks = {}  # {"binance-BTC/USDT": (20000.2, 0.0002)}
-        self.symbols_mappings = {}  # {"kucoin-VAI/USDT": "VAIOT/USDT"}
 
         self.thread = None
         self.running = False
-
-        # Retrieve all coins IDs from CoinGecko API (to be used to get mappings on add)
-        # Response format: [{"id": "01coin", "symbol": "zoc", "name": "01coin", ...}]
-        self.coingecko_all_coins_list = requests.get(
-            "https://api.coingecko.com/api/v3/coins/list", timeout=5
-        ).json()
 
     def start(self, update_every: float):
         """Starts the background API fetching task"""
@@ -61,55 +53,8 @@ class OrderBook:
         May be forced (during updates, to avoid stale prices on API issues)
         """
         if _id not in self.orderbook_bids or _id not in self.orderbook_asks or force:
-            if not force:
-                # only if new
-                self._populate_symbol_mappings(_id)
             self.orderbook_bids[_id] = (None, None)
             self.orderbook_asks[_id] = (None, None)
-
-    def _populate_symbol_mappings(self, _id: str) -> None:
-        """
-        Adds symbol mapping (may be different on exchange)
-        """
-        exchange_name, pair = _id.split("-")
-        base_currency, quote_currency = pair.split("/")
-
-        # Custom exchanges names on CoinGecko
-        if exchange_name == "bybit":
-            exchange_name = "bybit_spot"
-        if exchange_name == "gateio":
-            exchange_name = "gate"
-        if exchange_name == "okx":
-            exchange_name = "okex"
-
-        # Retrieve coin info (multiple coins can match)
-        coingecko_coin_ids = [
-            coin["id"]
-            for coin in self.coingecko_all_coins_list
-            if coin["symbol"] == base_currency.lower()
-        ]
-        if not coingecko_coin_ids:
-            return
-
-        # Get tickers on exchange for each found coin
-        found_tickers = []
-        for coin_id in coingecko_coin_ids:
-            url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/tickers?exchange_ids={exchange_name}"
-            result = requests.get(url, timeout=5)
-            if result.status_code >= 400:
-                continue
-            tickers = result.json()["tickers"]
-            if not tickers:
-                continue
-            found_tickers.append(tickers[0]["base"])
-        if not found_tickers:
-            return
-
-        # Best effort here. If we found an identical ticker, we do not change it.
-        exchange_ticker = (
-            base_currency if base_currency in found_tickers else found_tickers[0]
-        )
-        self.symbols_mappings[_id] = f"{exchange_ticker}/{quote_currency}"
 
     def _reset(self) -> None:
         """Empty all saved pair prices"""
@@ -258,16 +203,10 @@ class OrderBook:
         )
         return price, volume
 
-    def get_exchange_symbol(self, exchange_name: str, pair: str) -> str:
-        """Return pair with symbol on exchange"""
-        _id = f"{exchange_name.lower()}-{pair}"
-        return self.symbols_mappings.get(_id, pair)
-
     def get_orderbook_url(self, exchange_name: str, pair: str) -> str:
         """
         Helper generating URLs to exchange top orderbook APIs.
         """
-        pair = self.get_exchange_symbol(exchange_name.lower(), pair)
         if exchange_name == "binance":
             return f"https://api.binance.com/api/v3/depth?limit=1&symbol={pair.replace('/', '')}"
         if exchange_name == "bybit":
@@ -287,19 +226,18 @@ class OrderBook:
         Helper generating URLs to used exchange trade charts.
         """
         exchange_name = exchange_name.lower()
-        exchange_pair = self.get_exchange_symbol(exchange_name, pair)
         if exchange_name == "binance":
-            return f"[{pair}](https://www.binance.com/en/trade/{exchange_pair.replace('/', '_')})"
-        if exchange_name == "bybit":
-            return f"[{pair}](https://www.bybit.com/en-US/trade/spot/{exchange_pair.upper()})"
-        if exchange_name == "gateio":
             return (
-                f"[{pair}](https://www.gate.io/trade/{exchange_pair.replace('/', '_')})"
+                f"[{pair}](https://www.binance.com/en/trade/{pair.replace('/', '_')})"
             )
+        if exchange_name == "bybit":
+            return f"[{pair}](https://www.bybit.com/en-US/trade/spot/{pair.upper()})"
+        if exchange_name == "gateio":
+            return f"[{pair}](https://www.gate.io/trade/{pair.replace('/', '_')})"
         if exchange_name == "kraken":
-            return f"[{pair}](https://pro.kraken.com/app/trade/{exchange_pair.lower().replace('/', '-')})"
+            return f"[{pair}](https://pro.kraken.com/app/trade/{pair.lower().replace('/', '-')})"
         if exchange_name == "kucoin":
-            return f"[{pair}](https://www.kucoin.com/trade/{exchange_pair.replace('/', '-')})"
+            return f"[{pair}](https://www.kucoin.com/trade/{pair.replace('/', '-')})"
         if exchange_name in ["okx", "okex"]:
-            return f"[{pair}](https://www.okx.com/trade-spot/{exchange_pair.lower().replace('/', '-')})"
+            return f"[{pair}](https://www.okx.com/trade-spot/{pair.lower().replace('/', '-')})"
         raise RuntimeError(f"{exchange_name=} not supported")

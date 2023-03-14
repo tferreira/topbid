@@ -6,9 +6,6 @@
 Helper library to fetch and store current orderbook top bid/ask price and volume from crypto exchanges APIs.
 Currently supports Binance, Bybit, Gateio, Kraken, Kucoin and OKX.
 
-Some information is currently retrieved from [CoinGecko](https://www.coingecko.com/en/api/documentation) public API.
-Rate limit is between 10-30 requests/minute, which limits the number of new market pairs that can be added every minute.
-
 Requires Python 3.8+
 
 ## Installation
